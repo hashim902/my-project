@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CampusPass</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--v:#6D28D9;--p:#E11D74;--g:#15803D;--r:#DC2626;--ink:#150833;--bg:#F7F5FF;--grad:linear-gradient(135deg,#6D28D9,#E11D74)}
+*{box-sizing:border-box}body{margin:0;font:16px/1.5 'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--grad);color:#fff;padding:14px 5vw;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+header b{font-size:22px;font-weight:800;margin-right:auto}header a{color:#fff;cursor:pointer;font-weight:600}
+main{max-width:1100px;margin:24px auto;padding:0 16px}
+h1{font-size:30px;font-weight:800;margin:0 0 12px}h2{font-size:22px;margin:0 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.card{background:#fff;border-radius:20px;padding:18px;box-shadow:0 6px 20px #6d28d91a}
+.btn{background:var(--grad);color:#fff;border:0;border-radius:14px;padding:12px 18px;font:600 15px inherit;cursor:pointer;min-height:44px}
+.btn.s{background:#fff;color:var(--v);border:1.5px solid var(--v)}.btn.g{background:var(--g)}.btn.r{background:#fee2e2;color:var(--r)}
+input,select,textarea{width:100%;padding:12px;border:1.5px solid #ddd6fe;border-radius:12px;font:inherit;margin:4px 0 12px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--v)}label{font-weight:600;font-size:14px}
+.tag{display:inline-block;padding:2px 10px;border-radius:99px;background:#ede9fe;color:var(--v);font-size:13px;font-weight:600}
+.tag.ok{background:#dcfce7;color:var(--g)}.tag.bad{background:#fee2e2;color:var(--r)}.tag.warn{background:#fef3c7;color:#b45309}
+.bar{height:8px;background:#ede9fe;border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--grad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.row .btn{flex:none}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}.stats b{font-size:28px;display:block}
+table{width:100%;border-collapse:collapse}td,th{padding:8px;text-align:left;border-bottom:1px solid #ede9fe}
+.msg{padding:10px 14px;border-radius:12px;margin:10px 0}.err{background:#fee2e2;color:var(--r)}.good{background:#dcfce7;color:var(--g)}
+.auth{max-width:400px;margin:0 auto}
+</style></head><body>
+<header><b>🎟 CampusPass</b><span id="nav"></span></header>
+<main id="app"></main>
+<script>
+const $=s=>document.querySelector(s),app=$('#app');
+let user=JSON.parse(localStorage.user||'null'),token=localStorage.token||'';
+const money=n=>n?'KES '+n.toLocaleString():'Free';
+const fmt=d=>new Date(d).toLocaleString([], {weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+async function api(path,method='GET',body){
+  const r=await fetch('/api/'+path,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:body&&JSON.stringify(body)});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||'Error');return d}
+const flash=(m,ok)=>{const e=document.createElement('div');e.className='msg '+(ok?'good':'err');e.textContent=m;app.prepend(e);setTimeout(()=>e.remove(),4000)};
+const go=h=>{location.hash=h};
+function nav(){
+  const L=[['events','Discover']];
+  if(user){L.push(['tickets','My tickets']);
+    if(user.role!='student')L.push(['org','Organizer']);
+    if(user.role=='admin')L.push(['admin','Admin'])}
+  $('#nav').innerHTML=L.map(([h,t])=>`<a onclick="go('${h}')">${t}</a>`).join(' &nbsp; ')+' &nbsp; '+
+    (user?`<a onclick="logout()">Sign out (${user.name})</a>`:`<a onclick="go('login')">Sign in</a>`)}
+function logout(){localStorage.clear();user=null;token='';nav();go('login')}
+function setAuth(d){user=d.user;token=d.token;localStorage.user=JSON.stringify(user);localStorage.token=token;nav();go('events')}
+
+const views={
+ login(){app.innerHTML=`<div class="card auth"><h1>Welcome back</h1>
+  <label>Student email</label><input id="e" value="amani@students.ac.ke"><label>Password</label><input id="p" type="password" value="password123">
+  <div class="row"><button class="btn" id="in">Sign in</button><button class="btn s" id="reg">Create account</button></div>
+  <p style="font-size:13px">Demo: amani@students.ac.ke · organizer@students.ac.ke · admin@campus.ac.ke (password123)</p></div>`;
+  $('#in').onclick=async()=>{try{setAuth(await api('login','POST',{email:$('#e').value,password:$('#p').value}))}catch(e){flash(e.message)}};
+  $('#reg').onclick=async()=>{const name=prompt('Full name?');if(!name)return;
+   try{setAuth(await api('register','POST',{name,email:$('#e').value,password:$('#p').value}))}catch(e){flash(e.message)}}},
+ async events(){
+  app.innerHTML=`<h1>Upcoming events</h1><div class="card row" style="margin-bottom:16px">
+   <input id="q" placeholder="Search events"><select id="c"><option value="">All categories</option><option>Tech</option><option>Music</option><option>Career</option><option>Sports</option><option>Talk</option></select>
+   <select id="w"><option value="">Any date</option><option value="today">Today</option><option value="week">This week</option><option value="month">This month</option></select></div><div class="grid" id="list"></div>`;
+  const load=async()=>{const ev=await api(`events?q=${encodeURIComponent($('#q').value)}&category=${$('#c').value}&when=${$('#w').value}`);
+   $('#list').innerHTML=ev.map(e=>{const left=e.capacity-e.booked;return `<div class="card"><span class="tag">${e.category}</span>
+    <h2>${e.title}</h2><div>📅 ${fmt(e.date)}<br>📍 ${e.venue}</div><p>${e.description}</p>
+    <div class="bar"><i style="width:${e.booked/e.capacity*100}%"></i></div><small>${left>0?left+' spots left':'<b style=color:var(--r)>Sold out</b>'}</small>
+    <div class="row" style="margin-top:10px"><b>${money(e.price)}</b><button class="btn" ${left>0?'':'disabled'} onclick="book(${e.id})">Book my spot</button></div></div>`}).join('')||'<p>No events found.</p>'};
+  ['q','c','w'].forEach(i=>$('#'+i).oninput=load);load()},
+ async tickets(){if(!user)return go('login');
+  const b=await api('bookings/mine');app.innerHTML='<h1>My tickets</h1><div class="grid">'+b.map(t=>`<div class="card" style="text-align:center">
+   <span class="tag ${t.status=='confirmed'?'ok':'bad'}">${t.checked_in?'Checked in':t.status}</span><h2>${t.title}</h2>
+   <div>${fmt(t.date)} · ${t.venue}</div><img src="${t.qr}" alt="QR ticket"><div><b>${t.code}</b></div>
+   ${t.status=='confirmed'&&!t.checked_in?`<button class="btn r" onclick="cancel(${t.id})">Cancel</button>`:''}</div>`).join('')+'</div>'},
+ async org(){if(!user)return go('login');const d=await api('organizer/dashboard');
+  app.innerHTML=`<h1>Organizer dashboard</h1><div class="stats"><div class="card"><b>${d.totals.bookings}</b>Total bookings</div>
+   <div class="card"><b>${d.totals.checkedIn}</b>Checked in</div><div class="card"><b>${money(d.totals.revenue)}</b>Revenue</div></div>
+   <div class="grid"><div class="card"><h2>Scan ticket</h2><input id="code" placeholder="Enter or scan code e.g. CP-8H2K4471"><button class="btn g" id="scan">Validate</button><div id="res"></div></div>
+   <div class="card"><h2>Create event</h2><input id="t" placeholder="Title"><div class="row"><select id="cat"><option>Tech</option><option>Music</option><option>Career</option><option>Sports</option><option>Talk</option></select><input id="pr" type="number" placeholder="Price (KES)"></div>
+   <input id="v" placeholder="Venue"><input id="d" type="datetime-local"><input id="cap" type="number" placeholder="Capacity"><textarea id="ds" placeholder="Description"></textarea>
+   <button class="btn" id="mk">Submit for approval</button></div></div>
+   <div class="card" style="margin-top:16px;overflow:auto"><h2>My events</h2><table><tr><th>Event</th><th>Status</th><th>Booked</th><th>Checked in</th></tr>`+
+   d.events.map(e=>`<tr><td>${e.title}</td><td><span class="tag ${e.status=='published'?'ok':'warn'}">${e.status}</span></td><td>${e.booked}/${e.capacity}</td><td>${e.checked}</td></tr>`).join('')+'</table></div>';
+  $('#scan').onclick=async()=>{const r=await api('scan','POST',{code:$('#code').value});
+   $('#res').innerHTML=`<div class="msg ${r.valid?'good':'err'}">${r.valid?`✔ Valid: ${r.name} · ${r.event} ×${r.qty}`:'✖ '+r.reason}</div>`};
+  $('#mk').onclick=async()=>{try{await api('events','POST',{title:$('#t').value,category:$('#cat').value,price:+$('#pr').value,venue:$('#v').value,date:$('#d').value,capacity:+$('#cap').value,description:$('#ds').value});
+   flash('Submitted for admin approval',1);views.org()}catch(e){flash(e.message)}}},
+ async admin(){if(!user)return go('login');const d=await api('admin/overview');
+  app.innerHTML=`<h1>Admin overview</h1><div class="card"><h2>Events awaiting approval</h2>`+(d.pending.map(e=>`<div class="row" style="margin:8px 0"><span>${e.title} · ${e.venue} · ${e.capacity} seats</span>
+   <button class="btn r" onclick="adm('events/${e.id}/reject')">Reject</button><button class="btn g" onclick="adm('events/${e.id}/approve')">Approve</button></div>`).join('')||'None')+`</div>
+   <div class="card" style="margin-top:16px;overflow:auto"><h2>Users</h2><table>`+d.users.map(u=>`<tr><td>${u.name}</td><td>${u.email}</td><td><span class="tag">${u.role}</span></td><td><span class="tag ${u.status=='active'?'ok':'bad'}">${u.status}</span></td>
+   <td><button class="btn s" onclick="adm('users/${u.id}/status',{status:'${u.status=='active'?'suspended':'active'}'})">${u.status=='active'?'Suspend':'Restore'}</button></td></tr>`).join('')+`</table></div>
+   <div class="card" style="margin-top:16px"><h2>Audit log</h2>`+d.audit.map(a=>`<div><small>${a.at}</small> — ${a.action}</div>`).join('')+'</div>'}
+};
+async function book(id){if(!user)return go('login');try{const r=await api('bookings','POST',{event_id:id,qty:1});flash("You're in! Code "+r.code,1);setTimeout(()=>go('tickets'),900)}catch(e){flash(e.message)}}
+async function cancel(id){if(confirm('Cancel this booking?')){await api('bookings/'+id,'DELETE');views.tickets()}}
+async function adm(p,b){await api('admin/'+p,'POST',b||{});views.admin()}
+async function route(){nav();const h=location.hash.slice(1)||'events';try{await (views[h]||views.events)()}catch(e){if(/sign in/i.test(e.message))go('login');else flash(e.message)}}
+addEventListener('hashchange',route);route();
+</script></body></html>
